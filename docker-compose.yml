@@ -15,6 +15,11 @@ services:
       # DO NOT use your personal admin account. See docs/DEPLOYMENT.md.
       - NC_USER=${NC_USER}
       - NC_PASS=${NC_PASS}
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: '1.0'
     labels:
       - "traefik.enable=true"
       - "traefik.http.routers.tldraw.rule=Host(`${TLDRAW_HOST}`)"
