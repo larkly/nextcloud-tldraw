@@ -9,11 +9,12 @@ import './index.css'
 const rootElement = document.getElementById('tldraw-root')
 
 if (rootElement) {
-  const { fileId, fileName, canWrite, wsServerUrl } = rootElement.dataset
+  const { fileId, fileName, canWrite, wsServerUrl, tokenUrl } = rootElement.dataset
 
-  if (fileId && wsServerUrl) {
-    // Initial token fetch
-    fetch(`/apps/tldraw/token/${fileId}`)
+  if (fileId && wsServerUrl && tokenUrl) {
+    // Initial token fetch — URL is generated server-side via Nextcloud's URL generator
+    // to handle Nextcloud installations at subpaths correctly.
+    fetch(tokenUrl)
       .then((res) => {
         if (!res.ok) throw new Error('Failed to fetch token')
         return res.json()

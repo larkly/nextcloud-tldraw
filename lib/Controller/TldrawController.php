@@ -12,24 +12,28 @@ use OCP\Files\NotFoundException;
 use OCP\Files\NotPermittedException;
 use OCP\IConfig;
 use OCP\IRequest;
+use OCP\IURLGenerator;
 use OCP\IUserSession;
 
 class TldrawController extends Controller {
     private $rootFolder;
     private $userId;
     private $config;
+    private $urlGenerator;
 
     public function __construct(
         string $appName,
         IRequest $request,
         IRootFolder $rootFolder,
         IUserSession $userSession,
-        IConfig $config
+        IConfig $config,
+        IURLGenerator $urlGenerator
     ) {
         parent::__construct($appName, $request);
         $this->rootFolder = $rootFolder;
         $this->userId = $userSession->getUser() ? $userSession->getUser()->getUID() : null;
         $this->config = $config;
+        $this->urlGenerator = $urlGenerator;
     }
 
     /**
@@ -57,13 +61,14 @@ class TldrawController extends Controller {
 
         $canWrite = $node->isUpdateable();
         $fileName = $node->getName();
-        
-        // We do NOT embed the token here. The frontend will fetch it via fetch().
+        $tokenUrl = $this->urlGenerator->linkToRoute('tldraw.tldraw.token', ['fileId' => $fileId]);
+
         return new TemplateResponse('tldraw', 'editor', [
             'fileId' => $fileId,
             'fileName' => $fileName,
             'canWrite' => $canWrite,
             'wsServerUrl' => $this->config->getAppValue('tldraw', 'collab_server_url', ''),
+            'tokenUrl' => $tokenUrl,
         ]);
     }
 
@@ -108,7 +113,7 @@ class TldrawController extends Controller {
             'ownerId' => $ownerId,
             'filePath' => $filePath,
             'canWrite' => $node->isUpdateable(),
-            'exp' => time() + 43200, // 12 hours token validity
+            'exp' => time() + 60, // 60 second token validity (used only for initial WS handshake)
         ];
 
         $jwt = $this->generateJwt($payload, $jwtSecret);

@@ -17,7 +17,7 @@ class AdminController extends Controller {
     }
 
     /**
-     * @NoAdminRequired
+     * @AdminRequired
      * @NoCSRFRequired
      */
     public function getSettings(): DataResponse {
@@ -28,7 +28,7 @@ class AdminController extends Controller {
     }
 
     /**
-     * @NoAdminRequired
+     * @AdminRequired
      */
     public function saveSettings(string $collabServerUrl, string $jwtSecret): DataResponse {
         $this->config->setAppValue('tldraw', 'collab_server_url', $collabServerUrl);

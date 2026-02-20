@@ -12,5 +12,6 @@ Util::addStyle('tldraw', 'style'); // If we have CSS
      data-file-id="<?php p($_['fileId']); ?>"
      data-file-name="<?php p($_['fileName']); ?>"
      data-can-write="<?php p($_['canWrite'] ? 'true' : 'false'); ?>"
-     data-ws-server-url="<?php p($_['wsServerUrl']); ?>">
+     data-ws-server-url="<?php p($_['wsServerUrl']); ?>"
+     data-token-url="<?php p($_['tokenUrl']); ?>">
 </div>

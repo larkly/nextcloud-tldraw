@@ -1,6 +1,6 @@
 import express from 'express';
-import { WebSocketServer } from 'ws';
-import { createServer } from 'http';
+import { WebSocket, WebSocketServer } from 'ws';
+import { createServer, IncomingMessage } from 'http';
 import cors from 'cors';
 import crypto from 'crypto';
 import multer from 'multer';
@@ -55,7 +55,9 @@ function verifyJwt(token: string): any {
 	}
 }
 
-const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+// SVG is intentionally excluded: text-based format bypasses magic byte validation
+// and requires a full XML sanitiser to be safe. Reject server-side, document client-side.
+const ALLOWED_MIMES = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
 
 // Basic magic byte check
 function validateMagicBytes(buffer: Buffer, mimetype: string): boolean {
@@ -72,11 +74,6 @@ function validateMagicBytes(buffer: Buffer, mimetype: string): boolean {
         // RIFF....WEBP
         return buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
                buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50;
-    }
-    if (mimetype === 'image/svg+xml') {
-        // Simple heuristic: check for <svg or <?xml within first 100 chars
-        const start = buffer.toString('utf8', 0, Math.min(buffer.length, 100)).trim();
-        return start.toLowerCase().includes('<svg') || start.toLowerCase().includes('<?xml');
     }
     return false;
 }
@@ -204,7 +201,7 @@ server.on('upgrade', (req, socket, head) => {
 	});
 });
 
-wss.on('connection', async (ws, req, payload: any) => {
+wss.on('connection', async (ws: WebSocket, req: IncomingMessage, payload: any) => {
 	const { roomToken, fileId, userId, ownerId, filePath, canWrite } = payload;
     
     // Use the file owner's ID and path if available (from new PHP controller)

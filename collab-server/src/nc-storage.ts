@@ -97,7 +97,7 @@ export async function uploadAsset(
 		throw e;
 	}
 
-	return `/uploads/${filename}`;
+	return `/uploads/${encodeURIComponent(userId)}/${filename}`;
 }
 
 export async function fetchAsset(userId: string, filename: string): Promise<Buffer> {

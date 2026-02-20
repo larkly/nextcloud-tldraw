@@ -143,6 +143,15 @@ To work on the app locally:
 -   **Uploads:** Asset uploads require a valid JWT in the `Authorization` header.
 -   **Permissions:** Write access is enforced server-side based on the JWT `canWrite` claim.
 
+## Acknowledgements
+
+This project would not be possible without the excellent work of the [tldraw](https://tldraw.dev) team.
+
+- **[tldraw](https://tldraw.dev)** — the open-source whiteboard library powering the editor.
+- **[@tldraw/sync](https://github.com/tldraw/tldraw/tree/main/packages/sync)** — the real-time collaboration primitives used by the collab server.
+
+Thank you to the tldraw team for building and open-sourcing such a capable tool.
+
 ## License
 
 AGPL-3.0
