@@ -106,21 +106,31 @@ class TldrawController extends Controller {
         $ownerFolder = $this->rootFolder->getUserFolder($ownerId);
         $filePath = $ownerFolder->getRelativePath($node);
 
-        $payload = [
-            'fileId' => $fileId,
-            'roomToken' => $roomToken,
-            'userId' => $this->userId,
-            'ownerId' => $ownerId,
+        $canWrite = $node->isUpdateable();
+
+        $storageToken = $this->generateJwt([
+            'type'     => 'storage',
+            'fileId'   => $fileId,
+            'ownerId'  => $ownerId,
             'filePath' => $filePath,
-            'canWrite' => $node->isUpdateable(),
-            'exp' => time() + 60, // 60 second token validity (used only for initial WS handshake)
+            'canWrite' => $canWrite,
+            'exp'      => time() + 28800, // 8 hours
+        ], $jwtSecret);
+
+        // Short-lived token (60s) — used only for the WebSocket handshake.
+        // Embeds the storageToken so the collab server has it for file I/O callbacks.
+        $wsPayload = [
+            'fileId'       => $fileId,
+            'roomToken'    => $roomToken,
+            'userId'       => $this->userId,
+            'canWrite'     => $canWrite,
+            'storageToken' => $storageToken,
+            'exp'          => time() + 60,
         ];
 
-        $jwt = $this->generateJwt($payload, $jwtSecret);
-
         return new JSONResponse([
-            'token' => $jwt,
-            'wsUrl' => $this->config->getAppValue('tldraw', 'collab_server_url', ''),
+            'token'  => $this->generateJwt($wsPayload, $jwtSecret),
+            'wsUrl'  => $this->config->getAppValue('tldraw', 'collab_server_url', ''),
         ]);
     }
 

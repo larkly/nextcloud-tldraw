@@ -4,17 +4,17 @@ This document describes the design of the Nextcloud tldraw application for contr
 
 ## Overview
 
-The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. Nextcloud handles authentication and file storage; the Collab Server handles real-time sync. The two are decoupled and communicate only via short-lived JWTs and WebDAV.
+The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. Nextcloud handles authentication and file storage; the Collab Server handles real-time sync. The two communicate via short-lived JWTs (WebSocket auth) and file-scoped storage tokens (file I/O callbacks). The Collab Server holds no Nextcloud credentials.
 
 ```
-┌─────────────────────────────────┐      ┌──────────────────────────────┐
-│         Nextcloud (PHP)         │      │    Collab Server (Node.js)   │
-│                                 │ JWT  │                              │
-│  • User auth & file permissions │─────►│  • WebSocket rooms           │
-│  • Issues 60s JWTs              │      │  • Real-time sync            │
-│  • Serves React editor          │◄─────│  • Persists state via WebDAV │
-│  • Stores .tldr files           │WebDAV│                              │
-└─────────────────────────────────┘      └──────────────────────────────┘
+┌─────────────────────────────────┐         ┌──────────────────────────────┐
+│         Nextcloud (PHP)         │         │    Collab Server (Node.js)   │
+│                                 │  60s JWT │                              │
+│  • User auth & file permissions │─────────►│  • WebSocket rooms           │
+│  • Issues JWTs + storage tokens │         │  • Real-time sync            │
+│  • Exposes file I/O callbacks   │◄─────────│  • Calls back for file I/O   │
+│  • Stores .tldr files & assets  │callbacks │  • No Nextcloud credentials  │
+└─────────────────────────────────┘         └──────────────────────────────┘
 ```
 
 ---
@@ -31,17 +31,31 @@ The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. 
 - Generates the token endpoint URL server-side via `IURLGenerator::linkToRoute()` and injects it into the editor template as a `data-token-url` attribute, ensuring correct URLs regardless of whether Nextcloud is installed at a subpath.
 - Serves the compiled React frontend as a single script (`js/tldraw-main.js`).
 
-#### JWT contents
+#### WebSocket JWT claims
+
+Issued by `TldrawController::token()`, short-lived (60 seconds — used only for the initial WebSocket handshake).
 
 | Claim | Description |
 |---|---|
 | `fileId` | Nextcloud file ID |
 | `roomToken` | HMAC-SHA256 of `"room:" + fileId`, keyed by the JWT secret — deterministic per file but not guessable |
 | `userId` | Current user's Nextcloud ID |
-| `ownerId` | File owner's Nextcloud ID (used by the Collab Server to construct the WebDAV path) |
-| `filePath` | Path of the file relative to the owner's home folder |
 | `canWrite` | Boolean — whether the current user has write permission |
+| `storageToken` | Embedded storage token (see below) — passed to the Collab Server for file I/O callbacks |
 | `exp` | Unix timestamp 60 seconds from issue |
+
+#### Storage token claims
+
+Embedded inside the WebSocket JWT as the `storageToken` claim. Used by the Collab Server for all file I/O callbacks; longer-lived (8 hours — covers a full editing session).
+
+| Claim | Description |
+|---|---|
+| `type` | Always `"storage"` — prevents use as a WebSocket token |
+| `fileId` | Nextcloud file ID |
+| `ownerId` | File owner's Nextcloud ID — used by PHP to open the correct user folder |
+| `filePath` | Path of the file relative to the owner's home folder |
+| `canWrite` | Boolean — enforced by PHP on PUT/POST callbacks |
+| `exp` | Unix timestamp 8 hours from issue |
 
 ### 2. Frontend (React + Vite)
 
@@ -61,8 +75,8 @@ The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. 
 
 - **WebSocket rooms:** Each open `.tldr` file gets a room keyed by its `roomToken`. Rooms are created on first connection and cleaned up after the last client disconnects.
 - **In-memory state:** Active room state is held in a per-room SQLite database (in-memory) for fast read/write during collaboration.
-- **Persistence:** Room state is serialized to JSON and written back to Nextcloud via WebDAV every 30 seconds and when the last client disconnects. On room creation, the current file content is loaded from Nextcloud to seed the room.
-- **Asset storage:** Uploaded images are stored in a hidden `.tldraw-assets/` folder in the file owner's Nextcloud home directory. They are served back to the editor at `/uploads/<userId>/<filename>` via a proxy endpoint on the Collab Server.
+- **Persistence:** Room state is serialized to JSON and written back to Nextcloud via PHP callback (`PUT /apps/tldraw/file/{fileId}`, authenticated with the storage token) every 30 seconds and when the last client disconnects. On room creation, the current file content is loaded via `GET /apps/tldraw/file/{fileId}` to seed the room.
+- **Asset storage:** Uploaded images are forwarded to Nextcloud via `POST /apps/tldraw/file/{fileId}/asset`. Assets are served directly by Nextcloud at `/apps/tldraw/asset/{key}` — the Collab Server does not proxy asset traffic.
 
 ---
 
@@ -100,7 +114,9 @@ The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. 
 ```
 5. Every 30 seconds (and when the last client disconnects):
    Collab Server serializes the room's SQLite state to a JSON snapshot
-   →  PUT /remote.php/dav/files/{ownerId}/{filePath}  (authenticated as Service User)
+   →  PUT /apps/tldraw/file/{fileId}
+      Authorization: Bearer <storageToken>
+   PHP validates the storage token, writes file via IRootFolder
    The .tldr file in Nextcloud is updated
 ```
 
@@ -116,4 +132,6 @@ The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. 
 | Path traversal via asset upload | Uploaded filenames are stripped to `[a-zA-Z0-9._-]` before being used in WebDAV paths |
 | Malicious file uploads | Magic bytes validated against declared MIME type; SVG rejected entirely (requires XML sanitiser to be safe) |
 | DoS via resource exhaustion | Docker container capped at 512 MB RAM and 1 CPU core; rate limiting on HTTP endpoints (1000 req / 15 min) |
-| Service account scope | Collab Server uses a dedicated bot account, not a shared admin credential — limits blast radius |
+| Compromised Collab Server | Storage tokens are scoped to a single file and expire after 8 hours — a compromised container cannot access files that are not currently open |
+| Credential exposure | Collab Server holds no Nextcloud credentials — only `JWT_SECRET_KEY`. Rotating the secret in Admin Settings immediately invalidates all active tokens |
+| Privilege escalation | PHP file callbacks enforce `canWrite` from the token; read-only users cannot trigger a write even if they forge a request to the collab server |

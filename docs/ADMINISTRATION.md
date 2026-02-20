@@ -61,11 +61,11 @@ Defined in `.env` next to `docker-compose.yml`.
 |---|---|---|
 | `JWT_SECRET_KEY` | Yes | 32-byte hex secret. Generate with `openssl rand -hex 32`. Must match Nextcloud Admin Settings. |
 | `NC_URL` | Yes | Base URL of your Nextcloud instance, no trailing slash (e.g. `https://cloud.example.com`) |
-| `NC_USER` | Yes | Username of the dedicated Service User bot (e.g. `tldraw-bot`) |
-| `NC_PASS` | Yes | **App Password** for the bot — not the login password |
 | `TLDRAW_HOST` | Yes | Domain for Traefik routing (e.g. `tldraw.example.com`) |
 | `ACME_EMAIL` | Yes* | Email for Let's Encrypt notifications. *Only required if using the bundled Traefik service. |
 | `PORT` | No | Internal container port. Default: `3000`. Do not change unless you have a port conflict. |
+
+> **No credentials needed.** The Collab Server performs file I/O by calling back to the Nextcloud PHP app using short-lived, file-scoped storage tokens. No Nextcloud username or password is required.
 
 ---
 
@@ -95,12 +95,14 @@ Defined in `.env` next to `docker-compose.yml`.
 
 ### Drawing changes are not saved / "Failed to save" in logs
 
-**Cause:** The Service User cannot write to Nextcloud via WebDAV.
+**Cause:** The Collab Server cannot reach the Nextcloud PHP callback endpoints, or the JWT secret is mismatched.
 
 **Diagnose:**
-1. Check container logs for `401 Unauthorized` or `403 Forbidden`: `docker compose logs tldraw-sync`
-2. Verify the bot user is in the **admin** group in Nextcloud (**Users** panel).
-3. Confirm `NC_PASS` is a valid **App Password** (not the account login password). Regenerate one if unsure.
+1. Check container logs for HTTP errors on callback calls: `docker compose logs tldraw-sync`
+   - `401` or `403` — JWT secret mismatch or expired storage token. Verify `JWT_SECRET_KEY` matches the secret in Nextcloud Admin Settings.
+   - `404` — `NC_URL` is wrong or the tldraw app is not enabled. Run `php occ app:enable tldraw`.
+   - Connection refused / timeout — the Collab Server cannot reach `NC_URL`. Check network routing between the containers.
+2. Confirm `NC_URL` in `.env` is the correct base URL of your Nextcloud instance (no trailing slash) and is reachable from inside the container.
 
 ### WebSocket connections are immediately closed with 403
 

@@ -9,6 +9,8 @@ This guide covers deploying the **Collab Server** — the Node.js backend requir
 - A **dedicated domain** pointing to your server (e.g. `tldraw.example.com`).
 - Access to your Nextcloud instance as an administrator.
 
+> **No service account needed.** The collab server no longer requires a Nextcloud user account. File I/O is handled via authenticated callbacks to the Nextcloud PHP app (see [Architecture](ARCHITECTURE.md)).
+
 ---
 
 ## Step 1: Get the Files
@@ -30,19 +32,7 @@ cd /opt/tldraw-sync
 
 ---
 
-## Step 2: Create a Service User in Nextcloud
-
-The Collab Server reads and writes `.tldr` files via WebDAV on behalf of all users. It must authenticate as a dedicated bot account — never use your personal admin account.
-
-1. In Nextcloud, go to **Users** and create a new user (e.g. `tldraw-bot`).
-2. Add that user to the `admin` group.
-   > **Why admin?** The WebDAV endpoint `/remote.php/dav/files/<user>/` only allows the owner or an admin to access it. The bot needs admin access to write files on behalf of other users.
-3. Log in as `tldraw-bot`, go to **Settings > Security > Devices & sessions**, and create a new **App Password** named `Collab Server`.
-   > **Important:** Copy this password immediately — it is only shown once. Do not use the login password.
-
----
-
-## Step 3: Configure the Environment
+## Step 2: Configure the Environment
 
 Copy `.env.example` to `.env` and fill in your values:
 
@@ -55,12 +45,9 @@ cp .env.example .env
 # Must match the 'JWT Secret' saved in Nextcloud Admin Settings.
 JWT_SECRET_KEY=paste_your_generated_secret_here
 
-# Base URL of your Nextcloud instance — no trailing slash
+# Base URL of your Nextcloud instance — no trailing slash.
+# The collab server calls back to this URL for file I/O.
 NC_URL=https://nextcloud.example.com
-
-# Bot account credentials from Step 2
-NC_USER=tldraw-bot
-NC_PASS=your-app-password-here
 
 # Domain where this collab server will be reachable
 TLDRAW_HOST=tldraw.example.com
@@ -71,7 +58,7 @@ ACME_EMAIL=admin@example.com
 
 ---
 
-## Step 4: Configure Traefik
+## Step 3: Configure Traefik
 
 The `docker-compose.yml` ships with Traefik v3 labels on the `tldraw-sync` service and an optional Traefik service for new deployments.
 
@@ -92,7 +79,7 @@ Keep the `traefik` service in the compose file and ensure ports 80 and 443 are o
 
 ---
 
-## Step 5: Start the Service
+## Step 4: Start the Service
 
 The `docker-compose.yml` is pre-configured to pull the image from the **GitHub Container Registry**:
 
@@ -132,7 +119,7 @@ docker compose up -d
 
 ---
 
-## Step 6: Verify the Service
+## Step 5: Verify the Service
 
 ```bash
 # Check the container started cleanly
@@ -146,7 +133,7 @@ curl https://tldraw.example.com/health
 
 ---
 
-## Step 7: Configure Nextcloud
+## Step 6: Configure Nextcloud
 
 1. Log in to Nextcloud as an admin.
 2. Go to **Administration Settings > tldraw**.
