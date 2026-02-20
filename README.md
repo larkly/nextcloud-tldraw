@@ -1,5 +1,9 @@
 # Nextcloud tldraw App
 
+> [!WARNING]
+> **This project is currently in early development and is not ready for production use.**
+> We are actively working on it, and pull requests are accepted and greatly appreciated!
+
 ```
   _   _           _       _                 _
  | \ | | _____  _| |_ ___| | ___  _   _  __| |
