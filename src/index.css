@@ -1,0 +1,7 @@
+@import 'tldraw/tldraw.css';
+
+/* Fix for Nextcloud interfering with absolute positioning */
+#tldraw-root {
+  isolation: isolate;
+  z-index: 1000; 
+}

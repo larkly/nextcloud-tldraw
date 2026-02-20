@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<info>
+    <id>tldraw</id>
+    <name>tldraw</name>
+    <summary>Real-time collaborative drawing using tldraw.</summary>
+    <description>Create and collaboratively edit tldraw drawings stored as .tldr files in Nextcloud.</description>
+    <version>0.0.1</version>
+    <licence>agpl</licence>
+    <author>Bosse Klykken</author>
+    <namespace>OCA\Tldraw</namespace>
+    <category>office</category>
+    <category>files</category>
+    <website>https://github.com/larkly/nextcloud-tldraw</website>
+    <bugs>https://github.com/larkly/nextcloud-tldraw/issues</bugs>
+    <dependencies>
+        <nextcloud min-version="28" max-version="34"/>
+    </dependencies>
+</info>

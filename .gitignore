@@ -1,0 +1,8 @@
+node_modules/
+collab-server/node_modules/
+build/
+js/
+collab-server/dist/
+.env
+.DS_Store
+*.tar.gz

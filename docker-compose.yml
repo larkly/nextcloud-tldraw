@@ -1,0 +1,55 @@
+services:
+  tldraw-sync:
+    build: 
+      context: ./collab-server
+      dockerfile: Dockerfile
+    container_name: tldraw-sync
+    restart: unless-stopped
+    environment:
+      - PORT=3000
+      # SECURITY: Change this to a long random string. Must match 'jwt_secret' in Nextcloud App Settings.
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      # NEXTCLOUD CONFIGURATION
+      - NC_URL=${NC_URL}
+      # CREDENTIALS: Use a dedicated 'Service User' (Admin Group) for best security.
+      # DO NOT use your personal admin account. See docs/DEPLOYMENT.md.
+      - NC_USER=${NC_USER}
+      - NC_PASS=${NC_PASS}
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.tldraw.rule=Host(`${TLDRAW_HOST}`)"
+      - "traefik.http.routers.tldraw.entrypoints=websecure"
+      - "traefik.http.routers.tldraw.tls.certresolver=myresolver"
+      - "traefik.http.services.tldraw.loadbalancer.server.port=3000"
+      # Websocket support
+      - "traefik.http.middlewares.tldraw-websocket.headers.customrequestheaders.Upgrade=websocket"
+      - "traefik.http.middlewares.tldraw-websocket.headers.customrequestheaders.Connection=Upgrade"
+      - "traefik.http.routers.tldraw.middlewares=tldraw-websocket"
+
+  # Traefik Reverse Proxy (If you don't already have one running)
+  # If you already have Traefik, you can remove this service and join the network.
+  traefik:
+    image: traefik:v3.0
+    container_name: traefik
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      # Let's Encrypt Configuration
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      # Traefik Dashboard (Optional, insecure)
+      - "8080:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+
+networks:
+  default:
+    name: tldraw-net
