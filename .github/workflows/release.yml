@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'
 
+permissions:
+  contents: write
+
 jobs:
   build-and-release:
     runs-on: ubuntu-latest
@@ -25,6 +28,13 @@ jobs:
       - name: Build Frontend
         run: npm run build
 
+      - name: Organize Assets
+        run: |
+          mkdir -p css
+          if [ -f js/style.css ]; then
+            mv js/style.css css/style.css
+          fi
+
       - name: Get Version
         id: get_version
         run: |
@@ -42,6 +52,7 @@ jobs:
           mkdir -p build/artifacts/$APP_ID
           
           # Copy files
+          # Note: We copy 'css' explicitly after ensuring it exists/has content
           cp -r appinfo lib img templates css js build/artifacts/$APP_ID/
           
           # Create archive

@@ -17,6 +17,12 @@ echo "Building frontend assets..."
 npm install
 npm run build
 
+# Move CSS to correct location for Nextcloud
+mkdir -p css
+if [ -f js/style.css ]; then
+    mv js/style.css css/style.css
+fi
+
 # 3. Copy App Files
 echo "Copying application files..."
 cp -r appinfo lib img templates css js "$BUILD_DIR/"
