@@ -1,8 +1,11 @@
 services:
   tldraw-sync:
-    build: 
-      context: ./collab-server
-      dockerfile: Dockerfile
+    image: ghcr.io/larkly/nextcloud-tldraw:latest
+    # To build from source instead of pulling from GHCR, uncomment the block below
+    # and run: docker compose build
+    # build:
+    #   context: ./collab-server
+    #   dockerfile: Dockerfile
     container_name: tldraw-sync
     restart: unless-stopped
     environment:

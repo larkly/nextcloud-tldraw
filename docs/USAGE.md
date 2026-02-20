@@ -42,3 +42,6 @@ You can upload images directly onto the canvas:
 2.  **Copy and Paste:** Copy an image to your clipboard and press `Ctrl+V` (or `Cmd+V`) to paste it.
 
 Images are securely uploaded to your Nextcloud storage and embedded in the drawing.
+
+**Supported formats:** JPEG, PNG, GIF, WebP.
+SVG files are not supported as uploaded assets for security reasons. You can still export your drawing as an SVG from the menu.
