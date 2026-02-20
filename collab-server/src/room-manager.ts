@@ -5,8 +5,8 @@ interface RoomEntry {
 	room: TLSocketRoom<any, any>;
 	ncStorage: NcRoomStorage;
 	saveInterval: NodeJS.Timeout;
-	userId: string;
-	filePath: string;
+	fileId: string;
+	storageToken: string;
 }
 
 const rooms = new Map<string, RoomEntry>();
@@ -14,27 +14,25 @@ const rooms = new Map<string, RoomEntry>();
 export async function makeOrLoadRoom(
 	roomToken: string,
 	fileId: string,
-	userId: string,
-	filePath: string // Relative path in user's Nextcloud, e.g. "Documents/drawing.tldr"
+	storageToken: string
 ): Promise<TLSocketRoom<any, any>> {
 	const existing = rooms.get(roomToken);
 	if (existing) {
 		return existing.room;
 	}
 
-	// Create new storage backed by Nextcloud WebDAV
-	const ncStorage = await createNcRoomStorage(userId, filePath);
+	// Load room state from Nextcloud via PHP callback (no WebDAV / no admin credentials)
+	const ncStorage = await createNcRoomStorage(fileId, storageToken);
 
 	const room = new TLSocketRoom<any, any>({
 		storage: ncStorage.storage,
-		// When the last session leaves, we save and close
 		onSessionRemoved: async (_room, args) => {
 			if (args.numSessionsRemaining === 0) {
 				const entry = rooms.get(roomToken);
 				if (!entry) return;
 
 				clearInterval(entry.saveInterval);
-				await ncStorage.flush(userId, filePath);
+				await ncStorage.flush(fileId, storageToken);
 				ncStorage.close();
 				room.close();
 				rooms.delete(roomToken);
@@ -45,12 +43,12 @@ export async function makeOrLoadRoom(
 
 	// Auto-save every 30 seconds
 	const saveInterval = setInterval(() => {
-		ncStorage.flush(userId, filePath).catch((err) => {
+		ncStorage.flush(fileId, storageToken).catch((err) => {
 			console.error(`Auto-save failed for room ${roomToken}:`, err);
 		});
 	}, 30_000);
 
-	rooms.set(roomToken, { room, ncStorage, saveInterval, userId, filePath });
+	rooms.set(roomToken, { room, ncStorage, saveInterval, fileId, storageToken });
 	console.log(`Room created: ${roomToken} for file ${fileId}`);
 
 	return room;

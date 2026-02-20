@@ -6,7 +6,7 @@ import crypto from 'crypto';
 import multer from 'multer';
 import { rateLimit } from 'express-rate-limit';
 import { makeOrLoadRoom } from './room-manager.js';
-import { uploadAsset, fetchAsset } from './nc-storage.js';
+import { uploadAsset } from './nc-storage.js';
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET_KEY;
@@ -97,42 +97,23 @@ app.post('/uploads', upload.single('file'), async (req, res) => {
         return res.status(400).json({ error: 'File content does not match extension' });
     }
 
-	// Use user ID from token to determine storage location
+	// storageToken and fileId are forwarded from the WebSocket JWT the browser obtained
+	const { storageToken, fileId } = payload;
+	if (!storageToken || !fileId) {
+		return res.status(403).json({ error: 'Token missing storage context' });
+	}
+
 	try {
-        const targetUserId = payload.ownerId || payload.userId;
         // Strip everything outside [a-zA-Z0-9._-] to prevent path traversal via originalname
         const safeOriginalName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
 		const filename = `${crypto.randomUUID()}-${safeOriginalName}`;
-		await uploadAsset(targetUserId, filename, req.file.buffer, req.file.mimetype);
-		res.json({ url: `/uploads/${encodeURIComponent(targetUserId)}/${filename}` });
+		// uploadAsset POSTs to the PHP callback and returns a Nextcloud-hosted URL
+		const url = await uploadAsset(fileId, req.file.buffer, req.file.mimetype, storageToken);
+		res.json({ url });
 	} catch (e) {
         console.error(e);
 		res.status(500).json({ error: 'Upload failed' });
 	}
-});
-
-// Serve assets (proxied from NC)
-app.get('/uploads/:userId/:filename', async (req, res) => {
-    const { userId, filename } = req.params;
-    
-    // Path Traversal check
-    if (filename.includes('..') || filename.includes('/') || userId.includes('..') || userId.includes('/')) {
-        return res.status(400).send('Invalid path');
-    }
-
-    try {
-        const buffer = await fetchAsset(userId, filename);
-        // Simple MIME inference from extension
-        if (filename.endsWith('.png')) res.type('image/png');
-        else if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) res.type('image/jpeg');
-        else if (filename.endsWith('.gif')) res.type('image/gif');
-        else if (filename.endsWith('.webp')) res.type('image/webp');
-        else res.type('application/octet-stream'); // unknown/legacy files served as binary download
-        
-        res.send(buffer);
-    } catch(e) {
-        res.status(404).send('Not found');
-    }
 });
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
@@ -203,16 +184,17 @@ server.on('upgrade', (req, socket, head) => {
 });
 
 wss.on('connection', async (ws: WebSocket, req: IncomingMessage, payload: any) => {
-	const { roomToken, fileId, userId, ownerId, filePath, canWrite } = payload;
-    
-    // Use the file owner's ID and path if available (from new PHP controller)
-    // Fallback to current user and ID-based filename for older versions
-    const targetUserId = ownerId || userId;
-    const targetPath = filePath || `tldraw-${fileId}.tldr`;
+	const { roomToken, fileId, storageToken, canWrite } = payload;
+
+	if (!storageToken) {
+		console.error('No storageToken in JWT payload — rejecting connection');
+		ws.close();
+		return;
+	}
 
 	try {
-		const room = await makeOrLoadRoom(roomToken, fileId, targetUserId, targetPath);
-        
+		const room = await makeOrLoadRoom(roomToken, String(fileId), storageToken);
+
         // Enforce Read-Only if the token doesn't have write permission
         const socket = canWrite ? ws : makeReadOnlySocket(ws);
 

@@ -20,8 +20,8 @@ This repository contains a **Nextcloud app** that integrates [tldraw](https://tl
     -   Uses `@tldraw/sync` to connect to the Collab Server.
 3.  **Collab Server (Node.js):**
     -   Manages WebSocket rooms using `@tldraw/sync-core`.
-    -   Persists room state to SQLite (in-memory/temporary) and flushes to Nextcloud WebDAV.
-    -   Handles authenticated asset uploads.
+    -   Persists room state to SQLite (in-memory) and flushes to Nextcloud via PHP callbacks.
+    -   Handles authenticated asset uploads (forwarded to Nextcloud, served by PHP).
 
 ## Installation & Deployment
 
@@ -39,7 +39,6 @@ From the repository root:
 2.  Edit `.env` and set:
     -   `JWT_SECRET_KEY`: Generate with `openssl rand -hex 32`.
     -   `NC_URL`: Your Nextcloud instance URL (e.g., `https://cloud.example.com`).
-    -   `NC_USER` / `NC_PASS`: Username and App Password for the dedicated Service User (Admin Group).
     -   `TLDRAW_HOST`: The domain for the collab server (e.g., `tldraw.example.com`).
 3.  Pull and start:
     ```bash
@@ -73,11 +72,12 @@ From the repository root:
 ## Key Technical Notes
 
 -   **`@types/node` must be v22+** — `node:sqlite` (used in `nc-storage.ts`) requires Node.js 22 types.
--   **Asset URL format:** `/uploads/<encodeURIComponent(userId)>/<filename>` — both the upload response and the GET endpoint must use this form.
--   **Filename sanitization:** Any user-supplied filename used in a WebDAV path must be stripped to `[a-zA-Z0-9._-]` to prevent path traversal.
+-   **No Nextcloud credentials on the Collab Server** — file I/O uses PHP callbacks authenticated by a file-scoped `storageToken` (8h HS256 JWT). The storage token is embedded in the WebSocket JWT payload and threaded through the room manager to storage functions.
+-   **Asset URL format:** `${NC_URL}/apps/tldraw/asset/${encodeURIComponent(assetKey)}` — assets are served directly by the Nextcloud PHP app, not proxied by the Collab Server.
+-   **Filename sanitization:** Any user-supplied filename stored in Nextcloud must be stripped to `[a-zA-Z0-9._-]` to prevent path traversal.
 -   **SVG uploads are intentionally rejected** — `image/svg+xml` is not in `ALLOWED_MIMES`; removing this restriction requires adding a server-side XML sanitiser first.
 -   **Token URL is injected server-side** via `IURLGenerator::linkToRoute()` in `TldrawController::edit()` and read from `data-token-url` in `main.tsx` — do not revert to a hardcoded `/apps/tldraw/token/` path (breaks subpath installs).
--   **JWT expiry is 60 seconds** — tokens are used only for the initial WebSocket handshake; the connection persists after the token expires.
+-   **WebSocket JWT expiry is 60 seconds** — tokens are used only for the initial WebSocket handshake; the connection persists after the token expires. Storage tokens expire after 8 hours.
 
 ## Workflow Preferences
 
@@ -90,5 +90,5 @@ From the repository root:
 
 | # | Title | Status |
 |---|-------|--------|
-| 1 | Excessive Privilege (Service Account) | Open — architecture limitation, no fix yet |
+| 1 | Excessive Privilege (Service Account) | Fixed in `feat/wopi-style-callback-api` — WOPI-style PHP callbacks, no admin account |
 | 4 | CSWSH — verify Origin check behind Traefik | Open — needs Traefik proxy config investigation |

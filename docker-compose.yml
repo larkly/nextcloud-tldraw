@@ -13,11 +13,8 @@ services:
       # SECURITY: Change this to a long random string. Must match 'jwt_secret' in Nextcloud App Settings.
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       # NEXTCLOUD CONFIGURATION
+      # The collab server calls back to this URL for file I/O — no credentials needed.
       - NC_URL=${NC_URL}
-      # CREDENTIALS: Use a dedicated 'Service User' (Admin Group) for best security.
-      # DO NOT use your personal admin account. See docs/DEPLOYMENT.md.
-      - NC_USER=${NC_USER}
-      - NC_PASS=${NC_PASS}
     deploy:
       resources:
         limits:
