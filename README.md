@@ -20,6 +20,8 @@
 
 This application integrates [tldraw](https://tldraw.dev) into Nextcloud, allowing users to create, edit, and collaborate on whiteboards in real-time. Drawings are stored natively as `.tldr` files within your Nextcloud instance.
 
+**Container image:** `ghcr.io/larkly/nextcloud-tldraw:latest` — [view on GHCR](https://github.com/larkly/nextcloud-tldraw/pkgs/container/nextcloud-tldraw)
+
 ## Features
 
 - **Real-Time Collaboration:** Multiple users can edit the same drawing simultaneously.
@@ -75,13 +77,14 @@ To deploy this application, you need:
     -   `NC_USER` / `NC_PASS`: Credentials for the Service User created in Step 1.
     -   `TLDRAW_HOST`: The domain for the collab server.
 
-2.  Start the service using Docker Compose:
+2.  Pull the pre-built image and start the service:
     ```bash
-    docker-compose up -d
+    docker compose pull
+    docker compose up -d
     ```
-    This will start the Node.js server and Traefik (if enabled) to handle SSL.
+    This pulls `ghcr.io/larkly/nextcloud-tldraw:latest` from the GitHub Container Registry and starts the Node.js server with Traefik (if enabled) for SSL.
 
-See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for advanced Traefik configurations.
+See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Traefik configuration, pinning to a specific version, and building from source.
 
 ### 2. Install the Nextcloud App
 
