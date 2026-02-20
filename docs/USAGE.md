@@ -1,47 +1,71 @@
 # User Guide
 
-This guide explains how to use the tldraw application within Nextcloud.
+This guide explains how to use the tldraw drawing editor within Nextcloud.
+
+> **Prerequisite:** The tldraw app and its Collab Server backend must be set up by your Nextcloud administrator before you can use it. If you see a connection error when opening a drawing, contact your admin.
+
+---
 
 ## Creating a New Drawing
 
-1.  Navigate to the **Files** app in Nextcloud.
-2.  Click the **+ New** button in the top bar.
-3.  Select **New tldraw drawing**.
-4.  Enter a name for your drawing (e.g., `Brainstorm.tldr`) and press Enter.
+1. Navigate to the **Files** app in Nextcloud.
+2. Click the **+ New** button in the top bar.
+3. Select **New tldraw drawing**.
+4. Enter a name ending in `.tldr` (e.g. `Brainstorm.tldr`) and press Enter.
 
-The new file will be created and automatically opened in the editor.
+The file is created and automatically opened in the editor.
 
-## Editing & Tools
+---
 
-The editor provides a standard tldraw interface:
--   **Toolbar (Bottom):** Select tools like Select, Hand, Draw, Eraser, Shapes, Arrows, and Text.
--   **Menu (Top Left):** Access file options, preferences, and view settings.
--   **Zoom/Pan:** Use the mouse wheel to zoom, or hold Spacebar + Click and Drag to pan around the canvas.
+## The Editor
+
+The editor is the standard [tldraw](https://tldraw.dev) interface:
+
+- **Toolbar (bottom):** Draw, Select, Hand, Eraser, Shapes, Arrows, Text, and more.
+- **Menu (top left):** File options, preferences, and view settings.
+- **Zoom:** Mouse wheel, or pinch on a trackpad.
+- **Pan:** Hold Space and drag, or use the Hand tool.
+
+Your changes are saved back to Nextcloud automatically every 30 seconds and when you close the file.
+
+---
 
 ## Real-Time Collaboration
 
-Collaboration is automatic!
-1.  **Share the File:** Use Nextcloud's native sharing sidebar to share the `.tldr` file with other users or groups.
-2.  **Open Together:** When multiple users open the file, you will see each other's cursors in real-time.
-3.  **Permissions:**
-    -   **Can edit:** Users with edit permission can draw and modify the canvas.
-    -   **Read only:** Users with read-only permission can view the drawing but cannot make changes.
+Collaboration happens automatically when multiple users have the same file open.
+
+1. **Share the file:** Use Nextcloud's standard sharing sidebar to share the `.tldr` file with other users or groups.
+2. **Open simultaneously:** When another user opens the file, you will see their cursor and changes appear in real-time.
+3. **Permissions follow Nextcloud:**
+   - Users with **edit** permission can draw and modify the canvas.
+   - Users with **view/read-only** permission can see the drawing but cannot make changes.
+
+---
 
 ## Exporting
 
-To save your drawing as an image:
-1.  Click the **Menu** button (top left).
-2.  Select **Export**.
-3.  Choose your format (SVG, PNG, JSON, etc.).
-    -   *Note: This downloads the file to your computer, not to Nextcloud.*
+To export your drawing:
+
+1. Click the **Menu** button (top left hamburger icon).
+2. Select **Export**.
+3. Choose a format:
+   - **SVG** — scalable vector graphic, best for print or further editing.
+   - **PNG** — raster image, good for sharing or embedding.
+   - **JSON** — the raw tldraw document format, useful for backups or migration.
+
+> Exports are downloaded to your computer. They are not saved back to Nextcloud.
+
+---
 
 ## Inserting Images
 
-You can upload images directly onto the canvas:
-1.  **Drag and Drop:** Drag an image file from your computer directly onto the browser window.
-2.  **Copy and Paste:** Copy an image to your clipboard and press `Ctrl+V` (or `Cmd+V`) to paste it.
+You can embed images from your computer directly onto the canvas:
 
-Images are securely uploaded to your Nextcloud storage and embedded in the drawing.
+- **Drag and drop:** Drag an image file from your desktop onto the browser window.
+- **Copy and paste:** Copy an image to your clipboard and press `Ctrl+V` (or `Cmd+V`).
+
+Inserted images are uploaded to your Nextcloud storage and embedded in the drawing, so collaborators see them too.
 
 **Supported formats:** JPEG, PNG, GIF, WebP.
-SVG files are not supported as uploaded assets for security reasons. You can still export your drawing as an SVG from the menu.
+
+> SVG files cannot be uploaded as embedded images for security reasons. You can still *export* your drawing as an SVG from the menu.
