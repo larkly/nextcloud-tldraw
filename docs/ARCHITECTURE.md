@@ -7,14 +7,14 @@ This document describes the design of the Nextcloud tldraw application for contr
 The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. Nextcloud handles authentication and file storage; the Collab Server handles real-time sync. The two communicate via short-lived JWTs (WebSocket auth) and file-scoped storage tokens (file I/O callbacks). The Collab Server holds no Nextcloud credentials.
 
 ```
-┌─────────────────────────────────┐         ┌──────────────────────────────┐
-│         Nextcloud (PHP)         │         │    Collab Server (Node.js)   │
-│                                 │  60s JWT │                              │
-│  • User auth & file permissions │─────────►│  • WebSocket rooms           │
-│  • Issues JWTs + storage tokens │         │  • Real-time sync            │
-│  • Exposes file I/O callbacks   │◄─────────│  • Calls back for file I/O   │
-│  • Stores .tldr files & assets  │callbacks │  • No Nextcloud credentials  │
-└─────────────────────────────────┘         └──────────────────────────────┘
+┌─────────────────────────────────┐              ┌──────────────────────────────┐
+│         Nextcloud (PHP)         │              │    Collab Server (Node.js)   │
+│                                 │              │                              │
+│  • User auth & file permissions │── 60s JWT ──►│  • WebSocket rooms           │
+│  • Issues JWTs + storage tokens │              │  • Real-time sync            │
+│  • Exposes file I/O callbacks   │◄─ callbacks ─│  • Calls back for file I/O   │
+│  • Stores .tldr files & assets  │              │  • No Nextcloud credentials  │
+└─────────────────────────────────┘              └──────────────────────────────┘
 ```
 
 ---
