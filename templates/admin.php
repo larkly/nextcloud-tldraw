@@ -1,7 +1,5 @@
 <?php
 /** @var array $_ */
-use OCP\Util;
-
 script('core', 'oc');
 ?>
 

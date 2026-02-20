@@ -100,9 +100,10 @@ app.post('/uploads', upload.single('file'), async (req, res) => {
 	// Use user ID from token to determine storage location
 	try {
         const targetUserId = payload.ownerId || payload.userId;
-		const filename = `${crypto.randomUUID()}-${req.file.originalname}`;
-		const url = await uploadAsset(targetUserId, filename, req.file.buffer, req.file.mimetype);
-        // Return URL with userId so we can fetch it later
+        // Strip everything outside [a-zA-Z0-9._-] to prevent path traversal via originalname
+        const safeOriginalName = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+		const filename = `${crypto.randomUUID()}-${safeOriginalName}`;
+		await uploadAsset(targetUserId, filename, req.file.buffer, req.file.mimetype);
 		res.json({ url: `/uploads/${encodeURIComponent(targetUserId)}/${filename}` });
 	} catch (e) {
         console.error(e);
@@ -126,7 +127,7 @@ app.get('/uploads/:userId/:filename', async (req, res) => {
         else if (filename.endsWith('.jpg') || filename.endsWith('.jpeg')) res.type('image/jpeg');
         else if (filename.endsWith('.gif')) res.type('image/gif');
         else if (filename.endsWith('.webp')) res.type('image/webp');
-        else if (filename.endsWith('.svg')) res.type('image/svg+xml');
+        else res.type('application/octet-stream'); // unknown/legacy files served as binary download
         
         res.send(buffer);
     } catch(e) {
@@ -140,7 +141,7 @@ const server = createServer(app);
 const wss = new WebSocketServer({ noServer: true });
 
 // Wrapper to enforce read-only mode on a WebSocket
-function makeReadOnlySocket(ws: any) {
+function makeReadOnlySocket(ws: WebSocket) {
 	// We only need to proxy the 'on' method to filter incoming messages
 	return new Proxy(ws, {
 		get(target, prop) {
@@ -165,7 +166,7 @@ function makeReadOnlySocket(ws: any) {
 					}
 				};
 			}
-			return target[prop];
+			return (target as any)[prop];
 		},
 	});
 }
