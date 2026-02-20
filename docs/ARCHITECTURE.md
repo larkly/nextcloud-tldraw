@@ -1,94 +1,119 @@
 # System Architecture
 
-This document describes the high-level architecture of the Nextcloud tldraw application.
+This document describes the design of the Nextcloud tldraw application for contributors and anyone wanting to understand how the pieces fit together.
 
 ## Overview
 
-The system bridges a traditional LAMP stack application (Nextcloud) with a modern real-time WebSocket service (Node.js). Security and state synchronization are handled via short-lived JWTs and WebDAV.
+The system connects Nextcloud (PHP) with a real-time Node.js WebSocket service. Nextcloud handles authentication and file storage; the Collab Server handles real-time sync. The two are decoupled and communicate only via short-lived JWTs and WebDAV.
+
+```
+┌─────────────────────────────────┐      ┌──────────────────────────────┐
+│         Nextcloud (PHP)         │      │    Collab Server (Node.js)   │
+│                                 │ JWT  │                              │
+│  • User auth & file permissions │─────►│  • WebSocket rooms           │
+│  • Issues 60s JWTs              │      │  • Real-time sync            │
+│  • Serves React editor          │◄─────│  • Persists state via WebDAV │
+│  • Stores .tldr files           │WebDAV│                              │
+└─────────────────────────────────┘      └──────────────────────────────┘
+```
+
+---
 
 ## Components
 
 ### 1. Nextcloud App (PHP)
 
--   **Role:** Authentication Provider & File Manager.
--   **Responsibilities:**
-    -   Authenticates the user via the Nextcloud session.
-    -   Checks file permissions (Read / Write / Share).
-    -   Issues a signed **JWT** containing:
-        -   `fileId` — the Nextcloud file ID.
-        -   `roomToken` — HMAC-SHA256 derived from `fileId` (deterministic but obscure).
-        -   `userId` — the current user's ID.
-        -   `ownerId` — the file owner's ID (used by the collab server to determine the WebDAV path).
-        -   `filePath` — path relative to the owner's home folder.
-        -   `canWrite` — permission flag.
-        -   `exp` — expiration time (60 seconds from issue).
-    -   Generates the token endpoint URL server-side via `IURLGenerator::linkToRoute()` and injects it into the editor template as a `data-token-url` attribute. This ensures the correct URL is used regardless of Nextcloud's subpath configuration.
-    -   Serves the frontend assets.
+**Role:** Authentication provider and file manager.
 
-### 2. Frontend (React/Vite)
+- Authenticates users via the existing Nextcloud session — no separate login.
+- Checks per-file read/write permissions using the Nextcloud Files API.
+- Issues a signed JWT for each file open request (see [JWT contents](#jwt-contents) below).
+- Generates the token endpoint URL server-side via `IURLGenerator::linkToRoute()` and injects it into the editor template as a `data-token-url` attribute, ensuring correct URLs regardless of whether Nextcloud is installed at a subpath.
+- Serves the compiled React frontend as a single script (`js/tldraw-main.js`).
 
--   **Role:** The User Interface.
--   **Responsibilities:**
-    -   Embedded as a single script (`js/tldraw-main.js`) in the PHP template.
-    -   Reads the token URL from the `data-token-url` attribute on the root element (injected by PHP — never hardcoded).
-    -   Fetches the short-lived JWT from the token endpoint.
-    -   Connects to the Collab Server via WebSocket using the JWT.
-    -   Handles asset uploads to the Collab Server (`POST /uploads`).
+#### JWT contents
+
+| Claim | Description |
+|---|---|
+| `fileId` | Nextcloud file ID |
+| `roomToken` | HMAC-SHA256 of `"room:" + fileId`, keyed by the JWT secret — deterministic per file but not guessable |
+| `userId` | Current user's Nextcloud ID |
+| `ownerId` | File owner's Nextcloud ID (used by the Collab Server to construct the WebDAV path) |
+| `filePath` | Path of the file relative to the owner's home folder |
+| `canWrite` | Boolean — whether the current user has write permission |
+| `exp` | Unix timestamp 60 seconds from issue |
+
+### 2. Frontend (React + Vite)
+
+**Role:** The drawing editor UI.
+
+- Bundled as a single script embedded in the PHP template.
+- On load, reads the token URL from `data-token-url` (injected by PHP) and fetches a JWT.
+- Opens a WebSocket connection to the Collab Server using the JWT as a query parameter.
+- Sends drawing operations to the Collab Server and renders updates from other users in real-time.
+- Uploads image assets to the Collab Server (`POST /uploads`), which stores them in Nextcloud.
 
 ### 3. Collab Server (Node.js / Docker)
 
--   **Role:** Real-time Sync Engine.
--   **Container image:** `ghcr.io/larkly/nextcloud-tldraw` (published to GitHub Container Registry on every release).
--   **Responsibilities:**
-    -   **WebSocket Server:** Uses `@tldraw/sync-core` to manage collaborative rooms.
-    -   **Room Management:** Each open file gets an in-memory SQLite room; rooms are keyed by `roomToken`.
-    -   **Persistence:**
-        -   **Load:** On room creation, fetches the `.tldr` file from Nextcloud via WebDAV (using the Service User credentials).
-        -   **Flush:** Every 30 seconds and on room close, serializes the room state to JSON and `PUT`s it back to Nextcloud via WebDAV.
-    -   **Asset Storage:** Uploaded images are stored in `.tldraw-assets/` in the file owner's Nextcloud home directory and served back via the collab server at `/uploads/<userId>/<filename>`.
-    -   **Security:**
-        -   Validates JWT signature and expiry on every WebSocket connection.
-        -   Enforces the `canWrite` claim — read-only clients have write messages silently dropped.
-        -   Validates the `Origin` header against `NC_URL`.
-        -   Sanitizes uploaded filenames to `[a-zA-Z0-9._-]` before WebDAV path insertion.
-        -   Rejects SVG uploads (text-based format; not safe without a server-side XML sanitiser).
+**Role:** Real-time sync engine.
+
+**Container image:** `ghcr.io/larkly/nextcloud-tldraw` ([GHCR](https://github.com/larkly/nextcloud-tldraw/pkgs/container/nextcloud-tldraw))
+
+- **WebSocket rooms:** Each open `.tldr` file gets a room keyed by its `roomToken`. Rooms are created on first connection and cleaned up after the last client disconnects.
+- **In-memory state:** Active room state is held in a per-room SQLite database (in-memory) for fast read/write during collaboration.
+- **Persistence:** Room state is serialized to JSON and written back to Nextcloud via WebDAV every 30 seconds and when the last client disconnects. On room creation, the current file content is loaded from Nextcloud to seed the room.
+- **Asset storage:** Uploaded images are stored in a hidden `.tldraw-assets/` folder in the file owner's Nextcloud home directory. They are served back to the editor at `/uploads/<userId>/<filename>` via a proxy endpoint on the Collab Server.
+
+---
 
 ## Data Flow
 
-### 1. User Opens File
+### Opening a file
+
 ```
-Browser → GET /apps/tldraw/edit/{fileId}
-        ← PHP checks permissions, renders editor template with data-token-url injected
+1. Browser   →  GET /apps/tldraw/edit/{fileId}
+               PHP checks file permission, renders editor HTML with data-token-url injected
+
+2. React     →  GET {tokenUrl}                   (e.g. /apps/tldraw/token/42)
+               PHP verifies session, issues 60s JWT
+               Returns: { token, wsUrl }
+
+3. React     →  WebSocket upgrade to wss://tldraw.example.com?token={JWT}
+               Collab Server validates JWT signature + expiry
+               Loads room (fetches file from Nextcloud if not already in memory)
+               Connection established
 ```
 
-### 2. Editor Initialization
+### Real-time editing
+
 ```
-React   → GET {tokenUrl}   (e.g. /apps/tldraw/token/42)
-        ← PHP issues 60s JWT, returns {token, wsUrl}
-React   → WebSocket upgrade: wss://tldraw.example.com/connect?token={JWT}
-        ← Collab Server validates JWT, opens room
+4. User draws a shape
+   React encodes the operation as a binary @tldraw/sync update
+   →  WebSocket message to Collab Server
+   Collab Server applies it to the room's in-memory SQLite state
+   →  Broadcasts the update to all other connected clients
+   Other clients render the update instantly
 ```
 
-### 3. Real-Time Editing
+### Auto-save
+
 ```
-User draws shape
-  → tldraw encodes as binary update
-  → WebSocket message to Collab Server
-  → Collab Server broadcasts to all other clients in the room
-  → Other clients render the update
+5. Every 30 seconds (and when the last client disconnects):
+   Collab Server serializes the room's SQLite state to a JSON snapshot
+   →  PUT /remote.php/dav/files/{ownerId}/{filePath}  (authenticated as Service User)
+   The .tldr file in Nextcloud is updated
 ```
 
-### 4. Persistence (Auto-Save)
-```
-Every 30s (or on last client disconnect):
-  Collab Server serializes room state to JSON snapshot
-  → PUT to Nextcloud WebDAV as Service User
-     (path: /remote.php/dav/files/{ownerId}/{filePath})
-```
+---
 
-## Security Considerations
+## Security Model
 
--   **JWT Expiry (60s):** Tokens are single-use for the WebSocket handshake only. The connection itself remains open; the token is not re-checked after the handshake.
--   **Service User:** The Collab Server uses a dedicated Nextcloud admin account (`tldraw-bot`) instead of a global credential, limiting blast radius.
--   **Asset Isolation:** Assets are stored per-user in `.tldraw-assets/` and are served proxied through the collab server — not exposed directly from Nextcloud.
--   **Resource Limits:** The Docker container is capped at 512 MB RAM and 1 CPU core to prevent DoS via resource exhaustion.
+| Concern | Mitigation |
+|---|---|
+| Unauthorized WebSocket access | JWT required; signature verified with shared secret; 60s expiry limits replay window |
+| Read-only enforcement | `canWrite: false` in JWT causes Collab Server to silently drop write messages from that client |
+| Cross-site WebSocket hijacking | `Origin` header validated against `NC_URL` on every upgrade request |
+| Path traversal via asset upload | Uploaded filenames are stripped to `[a-zA-Z0-9._-]` before being used in WebDAV paths |
+| Malicious file uploads | Magic bytes validated against declared MIME type; SVG rejected entirely (requires XML sanitiser to be safe) |
+| DoS via resource exhaustion | Docker container capped at 512 MB RAM and 1 CPU core; rate limiting on HTTP endpoints (1000 req / 15 min) |
+| Service account scope | Collab Server uses a dedicated bot account, not a shared admin credential — limits blast radius |

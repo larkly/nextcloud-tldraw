@@ -20,131 +20,119 @@
 
 This application integrates [tldraw](https://tldraw.dev) into Nextcloud, allowing users to create, edit, and collaborate on whiteboards in real-time. Drawings are stored natively as `.tldr` files within your Nextcloud instance.
 
-**Container image:** `ghcr.io/larkly/nextcloud-tldraw:latest` — [view on GHCR](https://github.com/larkly/nextcloud-tldraw/pkgs/container/nextcloud-tldraw)
-
 ## Features
 
 - **Real-Time Collaboration:** Multiple users can edit the same drawing simultaneously.
 - **Native Integration:** `.tldr` files appear in Nextcloud Files with custom icons and previews.
 - **Secure Architecture:** Uses short-lived JWTs (60s) and authenticated uploads.
-- **Dockerized Backend:** Production-ready `docker-compose` setup with Traefik support.
+- **Dockerized Backend:** Production-ready `docker compose` setup with Traefik support.
 
-## Architecture
+## Quick Start
 
-The system consists of two main components:
+To deploy this application you need:
+1. A Nextcloud 28+ server (PHP 8.2+).
+2. A server running Docker and Docker Compose v2, with a dedicated domain (e.g. `tldraw.example.com`).
 
-1.  **Nextcloud App (PHP/JS):**
-    -   Handles file management, user authentication, and rendering the editor.
-    -   Located in this repository.
-    -   Built with PHP 8.2+ and React (Vite).
+### 1. Clone the repository
 
-2.  **Collab Server (Node.js/Docker):**
-    -   Manages real-time WebSocket connections.
-    -   Handles asset uploads securely.
-    -   Syncs drawing state to Nextcloud via WebDAV.
-    -   Located in `collab-server/`.
+```bash
+git clone https://github.com/larkly/nextcloud-tldraw.git
+cd nextcloud-tldraw
+```
 
-## Documentation
+### 2. Deploy the Collab Server (Docker)
 
--   [**User Guide:**](docs/USAGE.md) How to create, edit, and collaborate on drawings.
--   [**Administration Guide:**](docs/ADMINISTRATION.md) Configuration, updates, and troubleshooting.
--   [**Deployment Guide:**](docs/DEPLOYMENT.md) Setting up the Docker backend.
--   [**Architecture:**](docs/ARCHITECTURE.md) Detailed system design.
+The Collab Server is the Node.js backend that handles real-time sync. Its container image is published to the GitHub Container Registry:
 
+```
+ghcr.io/larkly/nextcloud-tldraw:latest
+```
 
-## Quick Start Deployment
+1. **Create a Service User in Nextcloud:**
+   - Create a new user (e.g. `tldraw-bot`) and add them to the `admin` group.
+   - Log in as that user, go to **Settings > Security > Devices & sessions**, and generate an **App Password** named `Collab Server`. Copy it — it is shown only once.
+   - See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for full details on why admin access is needed.
 
-To deploy this application, you need:
-1.  A Nextcloud 28+ server (PHP 8.2+).
-2.  A server running Docker (for the Collab backend).
-3.  A domain name for the Collab server (e.g., `tldraw.example.com`).
+2. **Configure the environment:**
+   ```bash
+   cp .env.example .env
+   ```
+   Edit `.env` and fill in your values:
+   - `JWT_SECRET_KEY` — generate with `openssl rand -hex 32`
+   - `NC_URL` — your Nextcloud instance URL (no trailing slash)
+   - `NC_USER` / `NC_PASS` — the Service User username and App Password from Step 1
+   - `TLDRAW_HOST` — the domain for the collab server
 
-### 1. Deploy the Collab Server (Docker)
+3. **Pull and start:**
+   ```bash
+   docker compose pull
+   docker compose up -d
+   ```
 
-1.  **Create Service User:**
-    -   Create a new Nextcloud user (e.g., `tldraw-bot`).
-    -   Add this user to the `admin` group.
-    -   See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for details on generating a secure App Password.
-
-2.  **Configure Environment:**
-    Copy `.env.example` to `.env` and fill in your values:
-    ```bash
-    cp .env.example .env
-    nano .env
-    ```
-    -   `JWT_SECRET_KEY`: A long random hex string (32 bytes recommended).
-    -   `NC_URL`: Your Nextcloud instance URL.
-    -   `NC_USER` / `NC_PASS`: Credentials for the Service User created in Step 1.
-    -   `TLDRAW_HOST`: The domain for the collab server.
-
-2.  Pull the pre-built image and start the service:
-    ```bash
-    docker compose pull
-    docker compose up -d
-    ```
-    This pulls `ghcr.io/larkly/nextcloud-tldraw:latest` from the GitHub Container Registry and starts the Node.js server with Traefik (if enabled) for SSL.
+4. **Verify:** open `https://tldraw.example.com/health` — you should see `{"status":"ok"}`.
 
 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for Traefik configuration, pinning to a specific version, and building from source.
 
-### 2. Install the Nextcloud App
+### 3. Install the Nextcloud App
 
-You can package the app for any Nextcloud server using the provided script:
+1. Build the release archive:
+   ```bash
+   bash scripts/make-release.sh
+   ```
+   This produces `nextcloud-tldraw-<version>.tar.gz`.
 
-1.  Run the build script:
-    ```bash
-    bash scripts/make-release.sh
-    ```
-    This creates a `nextcloud-tldraw-<version>.tar.gz` archive (e.g., `nextcloud-tldraw-0.0.1.tar.gz`).
+2. Extract it into your Nextcloud apps directory:
+   ```bash
+   tar -xzf nextcloud-tldraw-<version>.tar.gz -C /var/www/nextcloud/apps/
+   ```
 
-2.  Extract it into your Nextcloud `apps/` directory:
-    ```bash
-    tar -xzf nextcloud-tldraw-<version>.tar.gz -C /var/www/nextcloud/apps/
-    ```
+3. Enable the app:
+   ```bash
+   php occ app:enable tldraw
+   ```
 
-3.  Enable the app:
-    ```bash
-    php occ app:enable tldraw
-    ```
-
-4.  Configure Settings:
-    -   Go to **Administration Settings > tldraw**.
-    -   **Collab Server URL:** Enter your Collab Server domain (e.g., `https://tldraw.example.com`).
-    -   **JWT Secret:** Enter the *same* secret key from your `.env` file.
+4. In Nextcloud, go to **Administration Settings > tldraw** and set:
+   - **Collab Server URL** → `https://tldraw.example.com`
+   - **JWT Secret** → the same value as `JWT_SECRET_KEY` in `.env`
 
 ## Usage
 
-1.  Navigate to the **Files** app in Nextcloud.
-2.  Click the **+ New** button and select **New tldraw drawing**.
-3.  Name your file (e.g., `brainstorming.tldr`).
-4.  Click the file to open the editor.
-5.  Share the file with other users to collaborate in real-time!
+1. Navigate to the **Files** app in Nextcloud.
+2. Click **+ New** and select **New tldraw drawing**.
+3. Name your file (e.g. `brainstorming.tldr`) and press Enter.
+4. Click the file to open the editor.
+5. Share the file with other users to collaborate in real-time.
+
+See [docs/USAGE.md](docs/USAGE.md) for a full user guide.
+
+## Documentation
+
+| Guide | Contents |
+|---|---|
+| [User Guide](docs/USAGE.md) | Creating drawings, collaboration, exporting, inserting images |
+| [Deployment Guide](docs/DEPLOYMENT.md) | Collab Server setup, Traefik, GHCR image tags |
+| [Administration Guide](docs/ADMINISTRATION.md) | Updates, configuration reference, troubleshooting |
+| [Architecture](docs/ARCHITECTURE.md) | System design, data flow, security model |
 
 ## Development
 
-To work on the app locally:
+```bash
+# Frontend (watches for changes and rebuilds)
+npm install
+npm run dev
 
-1.  **Frontend:**
-    ```bash
-    npm install
-    npm run dev  # Watches for changes and rebuilds
-    ```
+# Collab Server
+cd collab-server && npm install && npm run dev
 
-2.  **Backend (PHP):**
-    -   Symlink this directory to your local Nextcloud apps folder.
-    -   Enable debug mode in Nextcloud to disable caching.
-
-3.  **Collab Server:**
-    ```bash
-    cd collab-server
-    npm install
-    npm run dev
-    ```
+# Backend (PHP): symlink this directory to your local Nextcloud apps/ folder
+# and enable debug mode in Nextcloud to disable caching
+```
 
 ## Security
 
--   **Tokens:** WebSocket connections use short-lived JWTs (60s expiry) to prevent replay attacks.
--   **Uploads:** Asset uploads require a valid JWT in the `Authorization` header.
--   **Permissions:** Write access is enforced server-side based on the JWT `canWrite` claim.
+- **Tokens:** WebSocket connections use short-lived JWTs (60s expiry) for the initial handshake.
+- **Uploads:** Asset uploads require a valid JWT in the `Authorization` header.
+- **Permissions:** Write access is enforced server-side via the JWT `canWrite` claim.
 
 ## Acknowledgements
 
@@ -152,8 +140,6 @@ This project would not be possible without the excellent work of the [tldraw](ht
 
 - **[tldraw](https://tldraw.dev)** — the open-source whiteboard library powering the editor.
 - **[@tldraw/sync](https://github.com/tldraw/tldraw/tree/main/packages/sync)** — the real-time collaboration primitives used by the collab server.
-
-Thank you to the tldraw team for building and open-sourcing such a capable tool.
 
 ## License
 
