@@ -19,7 +19,10 @@ const MAX_WS_CONNECTIONS_PER_IP = 10;
 function getClientIp(req: IncomingMessage): string {
 	const forwarded = req.headers['x-forwarded-for'];
 	if (forwarded) {
-		return (Array.isArray(forwarded) ? forwarded[0] : forwarded).split(',')[0].trim();
+		// Use the rightmost entry: Traefik appends the real client IP to the end of the
+		// chain. The leftmost entries are client-supplied and trivially spoofable.
+		const chain = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+		return chain.split(',').at(-1)!.trim();
 	}
 	return req.socket.remoteAddress ?? 'unknown';
 }
