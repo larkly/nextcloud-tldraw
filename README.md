@@ -138,9 +138,14 @@ cd collab-server && npm install && npm run dev
 
 This project would not be possible without the excellent work of the [tldraw](https://tldraw.dev) team.
 
-- **[tldraw](https://tldraw.dev)** — the open-source whiteboard library powering the editor.
+- **[tldraw](https://tldraw.dev)** — the whiteboard library powering the editor.
 - **[@tldraw/sync](https://github.com/tldraw/tldraw/tree/main/packages/sync)** — the real-time collaboration primitives used by the collab server.
+
+> [!IMPORTANT]
+> tldraw is **not** distributed under an OSI-approved open-source license. Its [custom license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md) permits free use in **development environments only**. Production deployment requires a separate commercial license from tldraw, Inc. Review the tldraw license before deploying this app to production.
 
 ## License
 
-AGPL-3.0
+The code in this repository is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
+
+**Note on third-party dependencies:** The core drawing library, [tldraw](https://tldraw.dev), is distributed under a [proprietary license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md) that is not OSI-approved. Production use of tldraw requires a separate commercial license from tldraw, Inc. The AGPL-3.0 license of this repository does not grant any rights to tldraw's code.
