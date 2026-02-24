@@ -12,6 +12,21 @@ const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET_KEY;
 const NC_URL = process.env.NC_URL;
 
+// Per-IP WebSocket connection tracking (upgrade events bypass express-rate-limit)
+const wsConnectionCounts = new Map<string, number>();
+const MAX_WS_CONNECTIONS_PER_IP = 10;
+
+function getClientIp(req: IncomingMessage): string {
+	const forwarded = req.headers['x-forwarded-for'];
+	if (forwarded) {
+		// Use the rightmost entry: Traefik appends the real client IP to the end of the
+		// chain. The leftmost entries are client-supplied and trivially spoofable.
+		const chain = Array.isArray(forwarded) ? forwarded[0] : forwarded;
+		return chain.split(',').at(-1)!.trim();
+	}
+	return req.socket.remoteAddress ?? 'unknown';
+}
+
 if (!JWT_SECRET) {
 	console.error('FATAL: JWT_SECRET_KEY is not set.');
 	process.exit(1);
@@ -153,6 +168,15 @@ function makeReadOnlySocket(ws: WebSocket) {
 }
 
 server.on('upgrade', (req, socket, head) => {
+	// Per-IP connection limit — checked first so JWT work is skipped for flooding IPs
+	const clientIp = getClientIp(req);
+	const currentCount = wsConnectionCounts.get(clientIp) ?? 0;
+	if (currentCount >= MAX_WS_CONNECTIONS_PER_IP) {
+		socket.write('HTTP/1.1 429 Too Many Requests\r\n\r\n');
+		socket.destroy();
+		return;
+	}
+
 	const url = new URL(req.url || '', 'http://localhost');
 	const token = url.searchParams.get('token');
 
@@ -179,6 +203,15 @@ server.on('upgrade', (req, socket, head) => {
     }
 
 	wss.handleUpgrade(req, socket, head, (ws) => {
+		wsConnectionCounts.set(clientIp, (wsConnectionCounts.get(clientIp) ?? 0) + 1);
+		ws.once('close', () => {
+			const updated = (wsConnectionCounts.get(clientIp) ?? 1) - 1;
+			if (updated <= 0) {
+				wsConnectionCounts.delete(clientIp);
+			} else {
+				wsConnectionCounts.set(clientIp, updated);
+			}
+		});
 		wss.emit('connection', ws, req, payload);
 	});
 });
