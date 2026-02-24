@@ -1,0 +1,37 @@
+# Nginx Ingress Controller — WebSocket-capable ingress for the collab server.
+# Replace tldraw.example.com with your actual hostname.
+# Assumes cert-manager is installed and a ClusterIssuer named "letsencrypt-prod" exists.
+# Remove the cert-manager annotations and tls block if you manage TLS another way.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: tldraw-sync
+  namespace: tldraw
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    # TLS — cert-manager (remove if managing TLS manually)
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # WebSocket support: keep the connection open for up to 1 hour
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+    # Force HTTP/1.1 so nginx can forward the Upgrade header
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+spec:
+  tls:
+    - hosts:
+        - tldraw.example.com
+      secretName: tldraw-tls
+  rules:
+    - host: tldraw.example.com
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: tldraw-sync
+                port:
+                  number: 3000

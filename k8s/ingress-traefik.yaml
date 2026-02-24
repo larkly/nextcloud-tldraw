@@ -1,0 +1,44 @@
+# Traefik IngressRoute — for Traefik v2/v3 deployed as a Kubernetes controller
+# (i.e. using the Traefik CRDs, not the Docker label approach).
+# Replace tldraw.example.com with your actual hostname.
+#
+# This assumes:
+#   - Traefik is installed with its CRDs (traefik.io/v1alpha1)
+#   - A TLS certificate is available via cert-manager or a manually-managed Secret
+#   - The "websecure" entrypoint is configured on port 443
+---
+# Middleware: pass Upgrade/Connection headers so WebSocket handshakes work
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: tldraw-websocket-headers
+  namespace: tldraw
+spec:
+  headers:
+    customRequestHeaders:
+      Upgrade: "websocket"
+      Connection: "Upgrade"
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: tldraw-sync
+  namespace: tldraw
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: Host(`tldraw.example.com`)
+      kind: Rule
+      middlewares:
+        - name: tldraw-websocket-headers
+      services:
+        - name: tldraw-sync
+          port: 3000
+  tls:
+    # Option A: cert-manager certificate (recommended)
+    # Create a Certificate resource in the tldraw namespace that writes to
+    # "tldraw-tls", then reference it here.
+    secretName: tldraw-tls
+    # Option B: Traefik-managed ACME (remove secretName, add certResolver)
+    # certResolver: myresolver
