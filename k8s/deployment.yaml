@@ -1,0 +1,88 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tldraw-sync
+  namespace: tldraw
+  labels:
+    app: tldraw-sync
+spec:
+  # WARNING: Keep replicas at 1.
+  # Room state is held in-memory per process. Running more than one replica
+  # without sticky sessions will split room state across pods and cause edits
+  # from different users to diverge silently.
+  # See k8s/README.md for details and the upgrade path.
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tldraw-sync
+  template:
+    metadata:
+      labels:
+        app: tldraw-sync
+    spec:
+      # Prevent the scheduler from placing a second pod on any node if replicas
+      # is accidentally increased — makes the single-replica constraint visible.
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app: tldraw-sync
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: tldraw-sync
+          image: ghcr.io/larkly/nextcloud-tldraw:latest
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "3000"
+            # NODE_OPTIONS is already set in the Dockerfile; override here is
+            # intentional to make the requirement explicit in the manifest.
+            - name: NODE_OPTIONS
+              value: "--experimental-sqlite"
+            - name: JWT_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: tldraw-secret
+                  key: JWT_SECRET_KEY
+            - name: NC_URL
+              valueFrom:
+                secretKeyRef:
+                  name: tldraw-secret
+                  key: NC_URL
+            - name: NC_USER
+              valueFrom:
+                secretKeyRef:
+                  name: tldraw-secret
+                  key: NC_USER
+            - name: NC_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: tldraw-secret
+                  key: NC_PASS
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 3000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "1000m"
+      restartPolicy: Always
