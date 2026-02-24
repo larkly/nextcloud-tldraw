@@ -92,3 +92,6 @@ From the repository root:
 |---|-------|--------|
 | 1 | Excessive Privilege (Service Account) | Fixed in `feat/wopi-style-callback-api` — WOPI-style PHP callbacks, no admin account |
 | 4 | CSWSH — verify Origin check behind Traefik | Open — needs Traefik proxy config investigation |
+| 11 | WebSocket connection rate limiting missing | Open — HTTP rate limiter bypassed by WS upgrade path |
+| 12 | Traefik dashboard exposed without auth | Open — port 8080 with `--api.insecure=true` |
+| 13 | Permissive CORS on HTTP endpoints | Open — `cors()` with no origin restriction |
