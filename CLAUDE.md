@@ -82,6 +82,7 @@ From the repository root:
 ## Workflow Preferences
 
 -   **No `Co-Authored-By` lines** in commit messages.
+-   **No AI/Claude attribution** in commit messages, PR bodies, issue comments, or any repository content. Do not mention Claude, AI, or Anthropic.
 -   **Feature branches + PR** for all non-trivial changes. Branch naming: `fix/<slug>` or `feat/<slug>`.
 -   **Run a quality check** (`Task` tool → `pr-reviewer` agent) before merging any PR.
 -   **Close fixed GitHub issues** in the PR body with `Closes #N` so they auto-close on merge.
