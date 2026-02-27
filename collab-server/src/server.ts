@@ -1,3 +1,8 @@
+/**
+ * Nextcloud tldraw
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 the nextcloud-tldraw contributors
+ */
 import express from 'express';
 import { WebSocket, WebSocketServer } from 'ws';
 import { createServer, IncomingMessage } from 'http';
