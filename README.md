@@ -148,4 +148,4 @@ This project would not be possible without the excellent work of the [tldraw](ht
 
 The code in this repository is licensed under the [GNU Affero General Public License v3.0](LICENSE) (AGPL-3.0).
 
-**Note on third-party dependencies:** The core drawing library, [tldraw](https://tldraw.dev), is distributed under a [proprietary license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md) that is not OSI-approved. Production use of tldraw requires a separate commercial license from tldraw, Inc. The AGPL-3.0 license of this repository does not grant any rights to tldraw's code.
+**Note on third-party dependencies:** The core drawing library, [tldraw](https://tldraw.dev), is distributed under a [proprietary license](https://github.com/tldraw/tldraw/blob/main/LICENSE.md) that is not OSI-approved. Production use of tldraw requires a separate commercial license from tldraw, Inc. The AGPL-3.0 license of this repository does not grant any rights to tldraw's code. See [`docs/LEGAL.md`](docs/LEGAL.md) for a full dependency licence summary and operator obligations.
