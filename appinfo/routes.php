@@ -1,4 +1,9 @@
 <?php
+/**
+ * Nextcloud tldraw
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 the nextcloud-tldraw contributors
+ */
 return [
     'routes' => [
         // Serves the editor page
