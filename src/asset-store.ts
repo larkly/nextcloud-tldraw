@@ -1,3 +1,8 @@
+/**
+ * Nextcloud tldraw
+ * SPDX-License-Identifier: AGPL-3.0-or-later
+ * Copyright (c) 2026 the nextcloud-tldraw contributors
+ */
 import { TLAssetStore } from 'tldraw'
 
 export function createAssetStore(serverUrl: string, token: string): TLAssetStore {
