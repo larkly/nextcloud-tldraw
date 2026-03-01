@@ -1,8 +1,7 @@
 # Nextcloud tldraw App
 
-> [!WARNING]
-> **This project is currently in early development and is not ready for production use.**
-> We are actively working on it, and pull requests are accepted and greatly appreciated!
+> [!CAUTION]
+> **Project is archived.** As tldraw is proprietary and requires a license to use in production, it has some unacceptable implications for any Nextcloud instance in production to utilize this. As such, the work has been ended and the repository archived.
 
 ```
   _   _           _       _                 _
