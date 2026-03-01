@@ -1,7 +1,7 @@
 # Nextcloud tldraw App
 
-> [!CRITICAL]
-> ** Project is archived. As tldraw is proprietary and requires a license to use in production, it has some unacceptable implications for any Nextcloud instance in production to utilize this. As such, the work has been ended and the repository archived. 
+> [!CAUTION]
+> **Project is archived.** As tldraw is proprietary and requires a license to use in production, it has some unacceptable implications for any Nextcloud instance in production to utilize this. As such, the work has been ended and the repository archived.
 
 > [!WARNING]
 > **This project is currently in early development and is not ready for production use.**
